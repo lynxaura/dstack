@@ -1,3 +1,14 @@
+FROM docker.m.daocloud.io/library/node:22-slim AS frontend-builder
+
+WORKDIR /frontend
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+COPY frontend/ ./
+RUN npm run build
+
+
 FROM docker.m.daocloud.io/library/python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
@@ -23,6 +34,7 @@ ENV PATH="/root/.local/bin:/dstack-server/.venv/bin:$PATH"
 
 COPY pyproject.toml uv.lock README.md ./
 COPY src src
+COPY --from=frontend-builder /frontend/build src/dstack/_internal/server/statics
 COPY skills skills
 COPY examples/plugins/example_plugin_server examples/plugins/example_plugin_server
 RUN uv sync --extra all --no-dev

@@ -16,9 +16,12 @@
 
 `docker/lynx/Dockerfile` 会直接基于当前 checkout 的源码构建 dstack server，而不是从 PyPI 安装已经发布的 dstack 版本，因此可以直接包含当前分支里尚未发布的修改。
 
+这个镜像也会同时构建 `frontend/` 管理界面，并把产物放到 dstack server 的静态资源目录中。部署后直接访问 server 的根地址即可打开管理界面，不需要额外部署前端服务。
+
 相比上游的 staging Dockerfile，这个 Dockerfile 还做了以下调整：
 
 - 使用 DaoCloud 的 Python 镜像源，避免部署链路无法访问 Docker Hub 时构建失败；
+- 使用 Node 22 构建 `frontend/`，并把 `frontend/build/` 打进 server 镜像；
 - 额外复制 `skills/` 和 `examples/plugins/example_plugin_server/`，满足当前 package/uv 配置的要求；
 - 使用 `uv sync --extra all --no-dev`，不安装开发和测试依赖；
 - 把 `/dstack-server/.venv/bin` 加入 `PATH`，这样 entrypoint 可以直接执行 `dstack server`。
