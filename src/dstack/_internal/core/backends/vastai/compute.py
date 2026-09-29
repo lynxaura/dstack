@@ -71,6 +71,9 @@ class VastAICompute(
         }
         if options.min_score is not None:
             filters["score"] = {"gte": options.min_score}
+        if options.extra_filters is not None:
+            for name, constraints in options.extra_filters.model_dump(exclude_none=True).items():
+                filters[name] = constraints
         match options.offer_order or VASTAI_DEFAULT_OFFER_ORDER:
             case VastAIOfferOrder.SCORE:
                 order = [("score", "desc")]

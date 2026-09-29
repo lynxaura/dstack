@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 from dstack._internal.core.backends.vastai.compute import VastAICompute
 from dstack._internal.core.backends.vastai.models import VastAIConfig, VastAICreds
+from dstack._internal.core.backends.vastai.profile_options import VastAIProfileOptions
 from dstack._internal.core.models.backends.base import BackendType
 from dstack._internal.core.models.instances import (
     Disk,
@@ -19,8 +20,8 @@ def _config(community_cloud=None) -> VastAIConfig:
     return VastAIConfig(creds=VastAICreds(api_key="test"), community_cloud=community_cloud)
 
 
-def _requirements() -> Requirements:
-    return Requirements(resources=ResourcesSpec())
+def _requirements(backend_options=None) -> Requirements:
+    return Requirements(resources=ResourcesSpec(), backend_options=backend_options)
 
 
 def _offer(
@@ -121,6 +122,31 @@ def test_vastai_compute_can_disable_community_cloud():
         vast_provider_cls.assert_called_once()
         assert vast_provider_cls.call_args.kwargs["community_cloud"] is False
         catalog_instance.add_provider.assert_called_once()
+
+
+def test_vastai_compute_merges_extra_filters_with_defaults():
+    options = VastAIProfileOptions(
+        extra_filters={
+            "storage_cost": {"lte": 0.05},
+            "inet_down_cost": {"lte": 0.01},
+            "inet_up": {"gt": 256},
+        }
+    )
+    with (
+        patch("dstack._internal.core.backends.vastai.compute.VastAIProvider") as vast_provider_cls,
+        patch("dstack._internal.core.backends.vastai.compute.gpuhunt.Catalog"),
+        patch("dstack._internal.core.backends.vastai.compute.get_catalog_offers", return_value=[]),
+    ):
+        compute = VastAICompute(_config())
+        requirements = _requirements(backend_options=[options])
+        list(compute.get_offers(requirements, full_offers=False, unallocated_resources=False))
+
+        filters = vast_provider_cls.call_args.kwargs["extra_filters"]
+        assert filters["storage_cost"] == {"lte": 0.05}
+        assert filters["inet_down_cost"] == {"lte": 0.01}
+        assert filters["inet_up"] == {"gt": 256}
+        assert filters["inet_down"] == {"gt": 128}
+        assert filters["verified"] == {"eq": True}
 
 
 def test_vastai_run_job_bids_on_spot_offer():
