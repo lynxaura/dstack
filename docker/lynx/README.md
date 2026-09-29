@@ -25,7 +25,7 @@
 
 ## 本地构建镜像
 
-内部部署统一使用固定的 `dstack-prod2:latest` tag。每次发布直接覆盖这个 tag，避免长期保留大量按 commit 区分的镜像。
+内部部署统一使用固定的 `dstack-lynx:latest` tag。每次发布直接覆盖这个 tag，避免长期保留大量按 commit 区分的镜像。
 
 构建时明确指定 `linux/amd64`：
 
@@ -33,7 +33,7 @@
 docker buildx build \
   --platform linux/amd64 \
   --load \
-  -t dstack-prod2:latest \
+  -t dstack-lynx:latest \
   -f docker/lynx/Dockerfile \
   .
 ```
@@ -41,7 +41,7 @@ docker buildx build \
 构建完成后可以检查镜像架构：
 
 ```bash
-docker image inspect dstack-prod2:latest \
+docker image inspect dstack-lynx:latest \
   --format '{{.RepoTags}} arch={{.Architecture}} id={{.Id}}'
 ```
 
@@ -50,7 +50,7 @@ docker image inspect dstack-prod2:latest \
 `prod-2` 不需要从 registry 拉这个自定义 dstack 镜像，可以直接从本机构建机通过 SSH 传过去：
 
 ```bash
-docker save dstack-prod2:latest | gzip -1 | \
+docker save dstack-lynx:latest | gzip -1 | \
   ssh prod-2 'gzip -d | docker load'
 ```
 
@@ -101,7 +101,7 @@ services:
       retries: 10
 
   server:
-    image: dstack-prod2:latest
+    image: dstack-lynx:latest
     restart: unless-stopped
     depends_on:
       postgres:
@@ -151,7 +151,7 @@ curl -I http://127.0.0.1:3000/
 
 ## 升级
 
-升级时，在本地重新构建 `dstack-prod2:latest` 并传到 `prod-2`，然后重新创建 server 容器：
+升级时，在本地重新构建 `dstack-lynx:latest` 并传到 `prod-2`，然后重新创建 server 容器：
 
 ```bash
 cd /root/deployments/dstack
@@ -166,6 +166,6 @@ docker compose up -d --force-recreate server
 docker image prune -f
 ```
 
-如果需要回滚，则在本地 checkout 到目标旧 commit，重新构建同一个 `dstack-prod2:latest`，传到 `prod-2` 后再次重建 server 容器即可。
+如果需要回滚，则在本地 checkout 到目标旧 commit，重新构建同一个 `dstack-lynx:latest`，传到 `prod-2` 后再次重建 server 容器即可。
 
 这个过程不会重建 PostgreSQL 和 `server-data` 对应的数据卷，所以数据库和 dstack server 的持久化数据都会保留。
