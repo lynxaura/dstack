@@ -115,7 +115,7 @@ services:
     volumes:
       - server-data:/root/.dstack/server
     ports:
-      - "3000:3000"
+      - "172.31.22.121:3000:3000"
 
 volumes:
   postgres-data:
@@ -149,8 +149,10 @@ docker compose up -d --force-recreate
 ```bash
 docker compose ps
 docker compose logs --tail=100 server
-curl -I http://127.0.0.1:3000/
+curl -I http://172.31.22.121:3000/
 ```
+
+`prod-2` 上只把 dstack 的 `3000` 端口绑定到内网 IP `172.31.22.121`，不要使用 `3000:3000` 让 Docker 监听所有网卡。
 
 ## 升级
 
