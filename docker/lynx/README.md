@@ -1,31 +1,31 @@
-# Lynx dstack deployment
+# Lynx dstack 部署说明
 
-This directory contains the Docker image definition used for Lynx deployments of dstack.
+这个目录用于保存 Lynx 环境部署 dstack 时使用的 Docker 镜像定义和部署说明。
 
-## What this fork changes
+## 这个 fork 改了什么
 
-The current Lynx fork adds configurable `extra_filters` to the Vast.ai backend profile options.
+当前 Lynx fork 给 Vast.ai backend 的 profile options 增加了可配置的 `extra_filters`。
 
-The extra filters are appended to dstack's existing Vast.ai offer filters and are passed to `gpuhunt.VastAIProvider`. They support Vast.ai fields such as `storage_cost`, `inet_down_cost`, `inet_up`, `static_ip`, `gpu_arch`, `pci_gen`, and `host_id`, with the comparison operators `lt`, `lte`, `eq`, `gte`, and `gt`.
+这些额外过滤条件会在 dstack 原有的 Vast.ai offer filters 基础上继续追加，并最终传给 `gpuhunt.VastAIProvider`。目前支持的 Vast.ai 字段包括 `storage_cost`、`inet_down_cost`、`inet_up`、`static_ip`、`gpu_arch`、`pci_gen`、`host_id` 等，比较操作符支持 `lt`、`lte`、`eq`、`gte` 和 `gt`。
 
-When multiple profiles are combined, lower-bound filters are tightened to the larger value and upper-bound filters are tightened to the smaller value. Conflicting `eq` values raise `CombineError`. Fields already managed by dstack itself, such as `verified`, `inet_down`, `gpu_name`, and `dph_total`, cannot be overridden through `extra_filters`.
+当多个 profile 合并时，下界条件会取更大的值，上界条件会取更小的值。如果同一个字段出现互相冲突的 `eq` 值，会直接抛出 `CombineError`。对于已经由 dstack 自己管理的字段，例如 `verified`、`inet_down`、`gpu_name` 和 `dph_total`，不允许通过 `extra_filters` 覆盖。
 
-This is a server-side change. No custom worker image is required for this feature.
+这个改动只发生在 server 端，不需要为 worker 单独构建自定义镜像。
 
-## Why this Dockerfile exists
+## 为什么单独放一个 Dockerfile
 
-`docker/lynx/Dockerfile` builds the dstack server directly from the current checkout instead of installing a released dstack package from PyPI.
+`docker/lynx/Dockerfile` 会直接基于当前 checkout 的源码构建 dstack server，而不是从 PyPI 安装已经发布的 dstack 版本，因此可以直接包含当前分支里尚未发布的修改。
 
-Compared with the upstream staging Dockerfile, it also:
+相比上游的 staging Dockerfile，这个 Dockerfile 还做了以下调整：
 
-- uses the DaoCloud Python mirror because Docker Hub may be unavailable from our deployment path;
-- copies `skills/` and `examples/plugins/example_plugin_server/`, which are required by the current package/uv configuration;
-- installs only non-development dependencies with `uv sync --extra all --no-dev`;
-- puts `/dstack-server/.venv/bin` on `PATH`, so the entrypoint can execute `dstack server` directly.
+- 使用 DaoCloud 的 Python 镜像源，避免部署链路无法访问 Docker Hub 时构建失败；
+- 额外复制 `skills/` 和 `examples/plugins/example_plugin_server/`，满足当前 package/uv 配置的要求；
+- 使用 `uv sync --extra all --no-dev`，不安装开发和测试依赖；
+- 把 `/dstack-server/.venv/bin` 加入 `PATH`，这样 entrypoint 可以直接执行 `dstack server`。
 
-## Build
+## 本地构建镜像
 
-Build an amd64 image locally and tag it with the Git commit being deployed:
+建议使用要部署的 Git commit SHA 作为镜像 tag，并明确构建 `linux/amd64` 镜像：
 
 ```bash
 SHA=$(git rev-parse --short=10 HEAD)
@@ -37,23 +37,23 @@ docker buildx build \
   .
 ```
 
-Verify the resulting architecture:
+构建完成后可以检查镜像架构：
 
 ```bash
 docker image inspect dstack-prod2:${SHA} \
   --format '{{.RepoTags}} arch={{.Architecture}} id={{.Id}}'
 ```
 
-## Transfer to prod-2
+## 传镜像到 prod-2
 
-`prod-2` does not need to pull the custom dstack image from a registry. Transfer it directly from the build machine:
+`prod-2` 不需要从 registry 拉这个自定义 dstack 镜像，可以直接从本机构建机通过 SSH 传过去：
 
 ```bash
 docker save dstack-prod2:${SHA} | gzip -1 | \
   ssh prod-2 'gzip -d | docker load'
 ```
 
-If `postgres:16` is not already present on `prod-2`, it can be transferred the same way. For example, when Docker Hub is unavailable locally:
+如果 `prod-2` 上还没有 `postgres:16`，也可以用同样的方法传过去。比如本地 Docker Hub 不可用时，可以先从 DaoCloud 镜像源拉取：
 
 ```bash
 docker pull --platform linux/amd64 docker.m.daocloud.io/library/postgres:16
@@ -63,22 +63,22 @@ docker save postgres:16 | gzip -1 | \
   ssh prod-2 'gzip -d | docker load'
 ```
 
-## prod-2 deployment
+## prod-2 部署方式
 
-The deployment lives at:
+线上部署目录固定为：
 
 ```text
 /root/deployments/dstack
 ```
 
-Only two services are required for this deployment:
+目前只需要两个服务：
 
-- dstack server;
-- PostgreSQL 16.
+- dstack server；
+- PostgreSQL 16。
 
-SSH proxy is intentionally not deployed.
+当前不部署 SSH proxy。
 
-A minimal `docker-compose.yaml` is:
+最小的 `docker-compose.yaml` 可以写成：
 
 ```yaml
 name: dstack
@@ -118,7 +118,7 @@ volumes:
   server-data:
 ```
 
-Create the deployment directory and a private `.env` file once:
+第一次部署时，在 `prod-2` 上创建部署目录和私有 `.env` 文件：
 
 ```bash
 ssh prod-2
@@ -133,14 +133,14 @@ EOF
 chmod 600 .env
 ```
 
-After placing `docker-compose.yaml` in that directory, start or update the deployment with:
+把 `docker-compose.yaml` 放到这个目录以后，启动或更新服务：
 
 ```bash
 cd /root/deployments/dstack
 docker compose up -d --force-recreate
 ```
 
-Check the deployment with:
+检查部署状态：
 
 ```bash
 docker compose ps
@@ -148,13 +148,15 @@ docker compose logs --tail=100 server
 curl -I http://127.0.0.1:3000/
 ```
 
-## Upgrade and rollback
+## 升级和回滚
 
-For an upgrade, build and transfer a new image tagged with the new Git SHA, update only the `server.image` value in `docker-compose.yaml`, then run:
+升级时，先基于新的 Git SHA 构建并传输一个新镜像，然后只修改 `docker-compose.yaml` 中 `server.image` 的 tag，最后执行：
 
 ```bash
 cd /root/deployments/dstack
 docker compose up -d --force-recreate server
 ```
 
-Do not prune the previous dstack image immediately. To roll back, restore the previous image tag in `docker-compose.yaml` and recreate the server container. The PostgreSQL and server-data volumes are not recreated during this process.
+不要马上清理上一版 dstack 镜像。这样如果新版本有问题，只需要把 `docker-compose.yaml` 中的镜像 tag 改回上一版，再重新创建 server 容器即可完成回滚。
+
+这个过程不会重建 PostgreSQL 和 `server-data` 对应的数据卷，所以数据库和 dstack server 的持久化数据都会保留。
