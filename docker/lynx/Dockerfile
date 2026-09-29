@@ -1,4 +1,4 @@
-FROM docker.m.daocloud.io/library/node:22-slim AS frontend-builder
+FROM node:22-slim AS frontend-builder
 
 WORKDIR /frontend
 
@@ -9,7 +9,7 @@ COPY frontend/ ./
 RUN npm run build
 
 
-FROM docker.m.daocloud.io/library/python:3.11-slim
+FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
 ENV DSTACK_SERVER_LOG_FORMAT=json

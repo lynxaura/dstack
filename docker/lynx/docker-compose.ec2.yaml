@@ -1,0 +1,33 @@
+name: dstack
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DSTACK_POSTGRES_USER:-dstack}
+      POSTGRES_PASSWORD: ${DSTACK_POSTGRES_PASSWORD:?Set DSTACK_POSTGRES_PASSWORD in the private .env file}
+      POSTGRES_DB: ${DSTACK_POSTGRES_DB:-dstack}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data:Z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    image: 806758135039.dkr.ecr.us-east-1.amazonaws.com/dstack-lynx:78c0c808b-ec2
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DSTACK_DATABASE_URL: postgresql+asyncpg://${DSTACK_POSTGRES_USER:-dstack}:${DSTACK_POSTGRES_PASSWORD}@postgres:5432/${DSTACK_POSTGRES_DB:-dstack}
+      DSTACK_SERVER_LOG_FORMAT: rich
+      DSTACK_RUNNER_DOWNLOAD_URL: https://cdn-us.lynxaura.com/dstack-runner-linux-amd64
+      DSTACK_SHIM_DOWNLOAD_URL: https://cdn-us.lynxaura.com/dstack-shim-linux-amd64
+    volumes:
+      - ./data/server:/root/.dstack/server:Z
+    ports:
+      - "127.0.0.1:3000:3000"
