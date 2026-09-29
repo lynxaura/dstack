@@ -2,15 +2,11 @@
 
 这个目录用于保存 Lynx 环境部署 dstack 时使用的 Docker 镜像定义和部署说明。
 
-## 这个 fork 改了什么
+## 功能变更概览
 
-当前 Lynx fork 给 Vast.ai backend 的 profile options 增加了可配置的 `extra_filters`。
+当前 Lynx fork 主要给 Vast.ai backend 的 profile options 增加了可配置的 `extra_filters`，用于在 dstack 原有筛选条件基础上追加 Vast.ai offer filters。这个改动只发生在 server 端，不需要修改 worker。
 
-这些额外过滤条件会在 dstack 原有的 Vast.ai offer filters 基础上继续追加，并最终传给 `gpuhunt.VastAIProvider`。目前支持的 Vast.ai 字段包括 `storage_cost`、`inet_down_cost`、`inet_up`、`static_ip`、`gpu_arch`、`pci_gen`、`host_id` 等，比较操作符支持 `lt`、`lte`、`eq`、`gte` 和 `gt`。
-
-当多个 profile 合并时，下界条件会取更大的值，上界条件会取更小的值。如果同一个字段出现互相冲突的 `eq` 值，会直接抛出 `CombineError`。对于已经由 dstack 自己管理的字段，例如 `verified`、`inet_down`、`gpu_name` 和 `dph_total`，不允许通过 `extra_filters` 覆盖。
-
-这个改动只发生在 server 端，不需要为 worker 单独构建自定义镜像。
+具体支持的字段、比较操作符和 profile 合并行为见项目根目录的 [`README.md` 中的 Lynx fork 说明](../../README.md#lynx-fork)。本文下面主要记录 Lynx 镜像的构建和部署方式。
 
 ## 为什么单独放一个 Dockerfile
 
