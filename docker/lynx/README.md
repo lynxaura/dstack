@@ -27,7 +27,7 @@ docker push "$ECR:$IMAGE_TAG"
 
 将修改提交并推送到 `lynx` 分支后，**Build Lynx dstack server** 自动触发；也可在 Actions 中点击 **Run workflow** 并选择 `lynx`。该工作流只允许在 `lynx` 分支执行，从对应 commit 构建 `linux/amd64` 镜像并推送到上面的 ECR；tag 固定为 commit SHA 前 8 位，不自动部署 EC2。
 
-仓库需要配置 Actions secret `AWS_ROLE_ARN`，用于 GitHub OIDC 认证。AWS 角色的信任策略应仅允许 subject `repo:lynxaura/dstack:ref:refs/heads/lynx`，audience 为 `sts.amazonaws.com`；角色需允许 `ecr:GetAuthorizationToken`，以及对 `dstack-lynx` 仓库执行 `ecr:BatchCheckLayerAvailability`、`ecr:GetDownloadUrlForLayer`、`ecr:BatchGetImage`、`ecr:InitiateLayerUpload`、`ecr:UploadLayerPart`、`ecr:CompleteLayerUpload`、`ecr:PutImage`。
+仓库需要配置 Actions secret `AWS_ROLE_ARN`，用于 GitHub OIDC 认证。AWS 角色的信任策略应仅允许 subject `repo:lynxaura@220947976/dstack@1392219201:ref:refs/heads/lynx`，audience 为 `sts.amazonaws.com`；角色需允许 `ecr:GetAuthorizationToken`，以及对 `dstack-lynx` 仓库执行 `ecr:BatchCheckLayerAvailability`、`ecr:GetDownloadUrlForLayer`、`ecr:BatchGetImage`、`ecr:InitiateLayerUpload`、`ecr:UploadLayerPart`、`ecr:CompleteLayerUpload`、`ecr:PutImage`。
 
 `push` 触发无需合入默认分支；Actions 页面的手动触发入口需要默认分支包含该工作流。构建成功后，Summary 会显示完整镜像地址；将 EC2 Compose 的 server image 更新为该地址，再执行下面的更新命令。
 

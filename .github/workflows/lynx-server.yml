@@ -39,7 +39,11 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-          allowed-account-ids: '806758135039'
+
+      - name: Verify AWS account
+        run: |
+          account=$(aws sts get-caller-identity --query Account --output text)
+          test "$account" = '806758135039'
 
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
