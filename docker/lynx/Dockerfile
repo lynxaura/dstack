@@ -32,7 +32,7 @@ ADD https://astral.sh/uv/install.sh /uv-installer.sh
 RUN sh /uv-installer.sh && rm /uv-installer.sh
 ENV PATH="/root/.local/bin:/dstack-server/.venv/bin:$PATH"
 
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml README.md ./
 COPY src src
 COPY --from=frontend-builder /frontend/build src/dstack/_internal/server/statics
 COPY skills skills
