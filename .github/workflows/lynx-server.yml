@@ -1,0 +1,69 @@
+name: Build Lynx dstack server
+
+on:
+  push:
+    branches: [lynx]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: lynx-dstack-image-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: 806758135039.dkr.ecr.us-east-1.amazonaws.com/dstack-lynx
+
+jobs:
+  build:
+    if: github.repository == 'lynxaura/dstack' && github.ref == 'refs/heads/lynx'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine image tag
+        id: image
+        shell: bash
+        run: |
+          commit=$(git rev-parse HEAD)
+          tag=${commit:0:8}
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "uri=$ECR_REPOSITORY:$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: '806758135039'
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push server image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/lynx/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.image.outputs.uri }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: Write build summary
+        env:
+          IMAGE_URI: ${{ steps.image.outputs.uri }}
+        run: |
+          echo '### Lynx dstack image' >> "$GITHUB_STEP_SUMMARY"
+          echo "\`$IMAGE_URI\`" >> "$GITHUB_STEP_SUMMARY"

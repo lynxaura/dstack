@@ -22,7 +22,9 @@ It streamlines development, training, and inference, and is compatible with any 
 
 这个 fork 目前主要对 Vast.ai backend 做了扩展：在 profile options 中增加可配置的 `extra_filters`，用于在 dstack 原有 Vast.ai offer filters 基础上继续追加筛选条件，并传给 `gpuhunt.VastAIProvider`。
 
-目前支持 `storage_cost`、`inet_down_cost`、`inet_up`、`static_ip`、`gpu_arch`、`pci_gen`、`host_id` 等 Vast.ai 字段，以及 `lt`、`lte`、`eq`、`gte`、`gt` 比较操作符。多个 profile 合并时会收紧上下界；冲突的 `eq` 条件会直接报错。`verified`、`inet_down`、`gpu_name`、`dph_total` 等已经由 dstack 自己管理的字段不允许通过 `extra_filters` 覆盖。
+目前支持 `storage_cost`、`inet_down`、`inet_down_cost`、`inet_up`、`static_ip`、`gpu_arch`、`pci_gen`、`host_id` 等 Vast.ai 字段，以及 `lt`、`lte`、`eq`、`gte`、`gt` 比较操作符。多个 profile 合并时会收紧上下界；冲突的 `eq` 条件会直接报错。`verified`、`gpu_name`、`dph_total` 等已经由 dstack 自己管理的字段不允许通过 `extra_filters` 覆盖。
+
+`inet_down` 的单位是 Mbps；通过 `extra_filters` 设置后会替换默认的 `>128Mbps` 条件，例如 `inet_down: {gte: 600}`。
 
 这个改动只发生在 server 端，不需要修改 worker。Lynx 自定义镜像的构建、`prod-2` 部署、升级和回滚方式见 [`docker/lynx/README.md`](docker/lynx/README.md)。
 

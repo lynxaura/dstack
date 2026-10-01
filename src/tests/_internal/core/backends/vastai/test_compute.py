@@ -129,6 +129,7 @@ def test_vastai_compute_merges_extra_filters_with_defaults():
         extra_filters={
             "storage_cost": {"lte": 0.05},
             "inet_down_cost": {"lte": 0.01},
+            "inet_down": {"gte": 600},
             "inet_up": {"gt": 256},
         }
     )
@@ -145,7 +146,7 @@ def test_vastai_compute_merges_extra_filters_with_defaults():
         assert filters["storage_cost"] == {"lte": 0.05}
         assert filters["inet_down_cost"] == {"lte": 0.01}
         assert filters["inet_up"] == {"gt": 256}
-        assert filters["inet_down"] == {"gt": 128}
+        assert filters["inet_down"] == {"gte": 600}
         assert filters["verified"] == {"eq": True}
 
 

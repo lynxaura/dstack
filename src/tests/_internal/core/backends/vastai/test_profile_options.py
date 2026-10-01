@@ -107,6 +107,7 @@ def test_vastai_profile_options_schema_exposes_extra_filter_operators():
         "has_avx",
         "host_id",
         "id",
+        "inet_down",
         "inet_down_cost",
         "inet_up",
         "inet_up_cost",
@@ -127,7 +128,7 @@ def test_vastai_profile_options_schema_exposes_extra_filter_operators():
     assert filter_schema["additionalProperties"] is False
 
 
-@pytest.mark.parametrize("field", ["verified", "inet_down", "gpu_name", "dph_total"])
+@pytest.mark.parametrize("field", ["verified", "gpu_name", "dph_total"])
 def test_vastai_profile_options_rejects_filters_already_exposed_by_dstack(field):
     with pytest.raises(ValidationError):
         VastAIProfileOptions(extra_filters={field: {"eq": True}})

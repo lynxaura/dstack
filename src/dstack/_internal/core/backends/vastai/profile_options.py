@@ -66,6 +66,7 @@ class VastAIExtraFilters(CoreModel):
     has_avx: Optional[VastAIFilter] = None
     host_id: Optional[VastAIFilter] = None
     id: Optional[VastAIFilter] = None
+    inet_down: Optional[VastAIFilter] = None
     inet_down_cost: Optional[VastAIFilter] = None
     inet_up: Optional[VastAIFilter] = None
     inet_up_cost: Optional[VastAIFilter] = None
