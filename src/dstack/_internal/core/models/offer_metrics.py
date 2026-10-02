@@ -34,3 +34,7 @@ class ColdStartEstimate(CoreModel):
     """Sum of traffic and instance charges, in USD."""
     cost_ratio: Optional[NonNegativeFloat] = None
     """Total cold-start cost divided by the cost of one instance-hour; may exceed 1."""
+    mixed_cold_price: Optional[NonNegativeFloat] = None
+    """Estimated cold-start cost plus one instance-hour's cost in USD; only a ranking value.
+    Does not change the hourly price or the spot bid.
+    """

@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Annotated, Literal, Optional, Union
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from dstack._internal.core.backends.base.profile_options import BackendProfileOptions
 from dstack._internal.core.models.common import CoreModel
@@ -16,6 +16,7 @@ from dstack._internal.utils.combine import (
 class VastAIOfferOrder(str, Enum):
     SCORE = "score"
     PRICE = "price"
+    MIXED_COLD_PRICE = "mixed_cold_price"
 
 
 VASTAI_DEFAULT_OFFER_ORDER = VastAIOfferOrder.SCORE
@@ -123,7 +124,10 @@ class VastAIProfileOptions(BackendProfileOptions["VastAIProfileOptions"]):
                 "Controls the order in which offers are considered for provisioning."
                 " Use `score` to prioritize the highest overall score first"
                 " (the default order in the Vast.ai console),"
-                " or `price` to prioritize the lowest-cost offers first."
+                " or `price` to prioritize the lowest hourly price first."
+                " Use `mixed_cold_price` to sort by estimated cold-start cost plus"
+                " one instance-hour's cost; requires `cold_start.download_size_gb`."
+                " Offers with unknown cold-start costs are placed last."
                 " Lower-cost offers are often less reliable,"
                 " so consider applying stricter filters when using `price`."
                 f" Defaults to `{VASTAI_DEFAULT_OFFER_ORDER.value}`"
@@ -170,6 +174,12 @@ class VastAIProfileOptions(BackendProfileOptions["VastAIProfileOptions"]):
             exclude_if=lambda value: value is None,
         ),
     ] = None
+
+    @model_validator(mode="after")
+    def validate_mixed_cold_price(self) -> "VastAIProfileOptions":
+        if self.offer_order == VastAIOfferOrder.MIXED_COLD_PRICE and self.cold_start is None:
+            raise ValueError("mixed_cold_price requires cold_start.download_size_gb")
+        return self
 
     def combine(self, other: "VastAIProfileOptions") -> "VastAIProfileOptions":
         return VastAIProfileOptions(

@@ -5,6 +5,9 @@ from dstack._internal.core.backends.vastai.profile_options import (
     VastAIOfferOrder,
     VastAIProfileOptions,
 )
+from dstack._internal.core.models.configurations import DstackConfiguration
+from dstack._internal.core.models.instances import InstanceOfferWithAvailability
+from dstack._internal.core.models.profiles import ProfilesConfig
 from dstack._internal.utils.combine import CombineError
 
 
@@ -180,3 +183,23 @@ class TestVastAIColdStartOptions:
             ]
             == 20
         )
+
+
+class TestMixedColdPriceOptions:
+    def test_requires_download_size(self):
+        with pytest.raises(ValidationError, match="requires cold_start.download_size_gb"):
+            VastAIProfileOptions(offer_order="mixed_cold_price")
+
+    def test_accepts_zero_download_size(self):
+        options = VastAIProfileOptions(
+            offer_order="mixed_cold_price", cold_start={"download_size_gb": 0}
+        )
+        assert options.offer_order == VastAIOfferOrder.MIXED_COLD_PRICE
+
+    def test_schema_exposes_order_and_response_price(self):
+
+        for model in (DstackConfiguration, ProfilesConfig):
+            schema = model.model_json_schema()
+            assert "mixed_cold_price" in schema["$defs"]["VastAIOfferOrder"]["enum"]
+        schema = InstanceOfferWithAvailability.model_json_schema()
+        assert "mixed_cold_price" in schema["$defs"]["ColdStartEstimate"]["properties"]

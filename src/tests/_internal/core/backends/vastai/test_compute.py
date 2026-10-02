@@ -69,7 +69,7 @@ def _run_job(compute: VastAICompute, offer: InstanceOfferWithAvailability):
             return_value=["echo hi"],
         ),
     ):
-        compute.run_job(
+        return compute.run_job(
             run=run,
             job=job,
             instance_offer=offer,
@@ -248,3 +248,67 @@ class TestVastAIOfferMetrics:
             )
         assert small[0].cold_start.estimated_duration_seconds == 200
         assert large[0].cold_start.estimated_duration_seconds == 400
+
+    def test_mixed_cold_price_prefers_higher_hourly_price_with_lower_start_cost(self):
+        expensive_start = self._offer(
+            price=0.3, metrics={"download_mbps": 1000, "download_cost_per_gb": 0.02}
+        )
+        cheap_start = self._offer(
+            price=0.45, metrics={"download_mbps": 1000, "download_cost_per_gb": 0.0025}
+        )
+        offers = self._get_offers(
+            [expensive_start, cheap_start], {"download_size_gb": 20}, "mixed_cold_price"
+        )
+        assert [o.price for o in offers] == [0.45, 0.3]
+        assert offers[0].cold_start.mixed_cold_price == 0.525
+        assert offers[0].cold_start.mixed_cold_price < offers[1].cold_start.mixed_cold_price
+
+    def test_mixed_cold_price_keeps_unknown_costs_last_and_ties_stable(self):
+        unknown = self._offer(price=0.01, metrics={})
+        a = self._offer(price=0.5)
+        b = self._offer(price=0.5)
+        a.instance.name, b.instance.name, unknown.instance.name = "a", "b", "unknown"
+        offers = self._get_offers([unknown, a, b], {"download_size_gb": 20}, "mixed_cold_price")
+        assert [o.instance.name for o in offers] == ["a", "b", "unknown"]
+        assert offers[2].cold_start.mixed_cold_price is None
+
+    def test_zero_download_size_reduces_mixed_order_to_hourly_price(self):
+        offers = self._get_offers(
+            [self._offer(price=0.8, metrics={}), self._offer(price=0.3, metrics={})],
+            {"download_size_gb": 0},
+            "mixed_cold_price",
+        )
+        assert [o.price for o in offers] == [0.3, 0.8]
+        assert [o.cold_start.mixed_cold_price for o in offers] == [0.3, 0.8]
+
+    def test_mixed_order_still_applies_ratio_filter(self):
+        offers = self._get_offers(
+            [self._offer(price=0.1), self._offer(price=0.5), self._offer(metrics={})],
+            {"download_size_gb": 20, "max_cost_ratio": 0.2},
+            "mixed_cold_price",
+        )
+        assert len(offers) == 1
+        assert offers[0].price == 0.5
+
+    def test_mixed_order_preserves_spot_bid_and_provisioning_price(self):
+        spot = self._offer(price=0.14, spot=True)
+        spot.backend_data["min_bid"] = 0.123456
+        offers = self._get_offers(
+            [self._offer(price=0.5), spot], {"download_size_gb": 20}, "mixed_cold_price"
+        )
+        assert offers[0].instance.resources.spot
+        compute = VastAICompute(_config())
+        compute.api_client = MagicMock()
+        compute.api_client.create_instance.return_value = 123
+        provisioning = _run_job(compute, offers[0])
+        assert provisioning.price == 0.14
+        assert compute.api_client.create_instance.call_args.kwargs["bid"] == 0.123456
+
+    def test_mixed_order_uses_score_as_upstream_tie_order(self):
+        with patch("dstack._internal.core.backends.vastai.compute.VastAIProvider") as provider:
+            VastAICompute(_config())._make_catalog(
+                VastAIProfileOptions(
+                    offer_order="mixed_cold_price", cold_start={"download_size_gb": 20}
+                )
+            )
+        assert provider.call_args.kwargs["order"] == [("score", "desc")]

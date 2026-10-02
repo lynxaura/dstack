@@ -37,6 +37,7 @@ def estimate_cold_start(
         estimated_instance_cost=instance_cost,
         estimated_cost=total,
         cost_ratio=ratio,
+        mixed_cold_price=_finite(total + price) if total is not None else None,
     )
 
 

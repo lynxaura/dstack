@@ -77,7 +77,8 @@ class VastAICompute(
             for name, constraints in options.extra_filters.model_dump(exclude_none=True).items():
                 filters[name] = constraints
         match options.offer_order or VASTAI_DEFAULT_OFFER_ORDER:
-            case VastAIOfferOrder.SCORE:
+            case VastAIOfferOrder.SCORE | VastAIOfferOrder.MIXED_COLD_PRICE:
+                # Mixed cost is computed locally; use score order as a stable tie-breaker.
                 order = [("score", "desc")]
             case VastAIOfferOrder.PRICE:
                 # NOTE: dph_base is only one of the price components,
@@ -134,6 +135,15 @@ class VastAICompute(
         offers = filtered_offers
         if (vastai_options.offer_order or VASTAI_DEFAULT_OFFER_ORDER) == VastAIOfferOrder.PRICE:
             offers = sorted(offers, key=lambda o: o.price)
+        elif vastai_options.offer_order == VastAIOfferOrder.MIXED_COLD_PRICE:
+            offers = sorted(
+                offers,
+                key=lambda o: (
+                    o.cold_start.mixed_cold_price
+                    if o.cold_start is not None and o.cold_start.mixed_cold_price is not None
+                    else float("inf")
+                ),
+            )
         return offers
 
     def run_job(

@@ -1675,7 +1675,8 @@ When a download size is configured, API and JSON offers also include `cold_start
   "estimated_download_cost": 0.04,
   "estimated_instance_cost": 0.027777777777777776,
   "estimated_cost": 0.06777777777777777,
-  "cost_ratio": 0.13555555555555554
+  "cost_ratio": 0.13555555555555554,
+  "mixed_cold_price": 0.5677777777777777
 }
 ```
 
@@ -1691,3 +1692,34 @@ Existing warm instances are reusable independently of this new-instance offer fi
 
 When combining a profile with a run configuration, the download sizes must agree if both
 specify `cold_start`. The lower of the two ratio limits is used.
+
+#### Sorting by cold-start cost plus one hour
+
+Set `offer_order: mixed_cold_price` to prioritize Vast.ai offers by the cost of one
+cold start followed by one hour of running:
+
+```yaml
+backend_options:
+  - type: vastai
+    offer_order: mixed_cold_price
+    cold_start:
+      download_size_gb: 20
+      # Optional: filter before sorting
+      max_cost_ratio: 0.2
+```
+
+```text
+mixed_cold_price = cold_start.estimated_cost + offer.price * 1 hour
+```
+
+This sorts ascending after filtering and before limiting the number of offers. It
+controls the Vast.ai provisioning attempt order as well as offer display order.
+`cold_start.download_size_gb` is required for this order. Offers whose cold-start costs
+are unknown appear last; ties retain their original score order. A zero download size
+reduces the ranking to the hourly instance price.
+
+The ranking value is returned as `cold_start.mixed_cold_price` whenever cold-start
+estimates are requested. It is not an hourly billing rate: `offer.price`, spot bids,
+and actual billing remain unchanged. There is no amortization of cold-start costs.
+This order applies only within Vast.ai; other backends retain their existing ordering
+and cross-backend merging behavior.

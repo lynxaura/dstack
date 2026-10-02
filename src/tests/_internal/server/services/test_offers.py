@@ -254,3 +254,28 @@ class TestGenerateSharedOfferMetrics:
         restricted = generate_shared_offer(offer, 1, 2)
         assert restricted.vastai == offer.vastai
         assert restricted.cold_start == offer.cold_start
+
+
+class TestMixedColdPriceOfferOrder:
+    @pytest.mark.asyncio
+    async def test_vast_order_is_preserved_before_offer_limit(self):
+        backend = Mock(TYPE=BackendType.VASTAI)
+        cheap_start = get_instance_offer_with_availability(backend=BackendType.VASTAI)
+        cheap_start.price = 0.45
+        cheap_start.cold_start = ColdStartEstimate(download_size_gb=20, mixed_cold_price=0.525)
+        expensive_start = get_instance_offer_with_availability(backend=BackendType.VASTAI)
+        expensive_start.price = 0.3
+        expensive_start.cold_start = ColdStartEstimate(download_size_gb=20, mixed_cold_price=0.717)
+        backend.compute.return_value.get_offers.return_value = [cheap_start, expensive_start]
+        with patch(
+            "dstack._internal.server.services.backends.get_project_backends",
+            return_value=[backend],
+        ):
+            offers = await get_offers_by_requirements(
+                project=Mock(),
+                profile=Profile(backends=[BackendType.VASTAI]),
+                requirements=Requirements(resources=ResourcesSpec()),
+                max_offers=1,
+            )
+        assert offers == [(backend, cheap_start)]
+        assert cheap_start.price == 0.45

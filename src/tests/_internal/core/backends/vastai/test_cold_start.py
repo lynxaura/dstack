@@ -14,6 +14,7 @@ class TestEstimateColdStart:
         assert estimate.estimated_instance_cost == pytest.approx(0.0277777778)
         assert estimate.estimated_cost == pytest.approx(0.0677777778)
         assert estimate.cost_ratio == pytest.approx(0.1355555556)
+        assert estimate.mixed_cold_price == pytest.approx(0.5677777778)
         assert estimate.bandwidth_utilization == 0.8
 
     def test_zero_traffic_price_is_not_unknown(self):
@@ -32,6 +33,7 @@ class TestEstimateColdStart:
         assert estimate.estimated_duration_seconds is None
         assert estimate.estimated_instance_cost is None
         assert estimate.estimated_cost is None
+        assert estimate.mixed_cold_price is None
         assert estimate.cost_ratio is None
 
     def test_unknown_traffic_charge_preserves_time_estimate(self):
@@ -40,11 +42,13 @@ class TestEstimateColdStart:
         assert estimate.estimated_download_cost is None
         assert estimate.estimated_instance_cost == pytest.approx(0.0277777778)
         assert estimate.estimated_cost is None
+        assert estimate.mixed_cold_price is None
 
     def test_zero_size_needs_no_bandwidth_data(self):
         estimate = estimate_cold_start(0, VastAIOfferMetrics(), 0.5)
         assert estimate.estimated_duration_seconds == 0
         assert estimate.estimated_cost == 0
+        assert estimate.mixed_cold_price == 0.5
         assert estimate.cost_ratio == 0
 
     def test_zero_hourly_price_has_no_defined_ratio(self):
@@ -66,4 +70,5 @@ class TestEstimateColdStart:
         )
         assert estimate.estimated_duration_seconds is None
         assert estimate.estimated_cost is None
+        assert estimate.mixed_cold_price is None
         assert estimate.cost_ratio is None
