@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Annotated, Literal, Optional, Union
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from dstack._internal.core.backends.base.profile_options import BackendProfileOptions
 from dstack._internal.core.models.common import CoreModel
@@ -106,12 +106,36 @@ class VastAIColdStartOptions(CoreModel):
         ),
     ] = None
 
+    amortization_hours: Annotated[
+        Optional[float],
+        Field(
+            gt=0,
+            allow_inf_nan=False,
+            description=(
+                "Hours over which cold-start costs are amortized for mixed_cold_price."
+                " Defaults to 1; fractional hours such as 0.5 are supported."
+                " Does not change the one-hour cost_ratio or actual billing"
+            ),
+            exclude_if=lambda value: value is None,
+        ),
+    ] = None
+
+    @field_validator("amortization_hours", mode="before")
+    @classmethod
+    def reject_boolean_hours(cls, value):
+        if isinstance(value, bool):
+            raise ValueError("amortization_hours must be a positive number")
+        return value
+
     def combine(self, other: "VastAIColdStartOptions") -> "VastAIColdStartOptions":
         if self.download_size_gb != other.download_size_gb:
             raise CombineError("Conflicting Vast.ai cold-start download sizes")
         return VastAIColdStartOptions(
             download_size_gb=self.download_size_gb,
             max_cost_ratio=combine_optional(self.max_cost_ratio, other.max_cost_ratio, min),
+            amortization_hours=get_single_value_optional(
+                self.amortization_hours, other.amortization_hours
+            ),
         )
 
 
@@ -125,8 +149,9 @@ class VastAIProfileOptions(BackendProfileOptions["VastAIProfileOptions"]):
                 " Use `score` to prioritize the highest overall score first"
                 " (the default order in the Vast.ai console),"
                 " or `price` to prioritize the lowest hourly price first."
-                " Use `mixed_cold_price` to sort by estimated cold-start cost plus"
-                " one instance-hour's cost; requires `cold_start.download_size_gb`."
+                " Use `mixed_cold_price` to sort by cold-start cost amortized over"
+                " its configured amortization duration plus the hourly instance price;"
+                " requires `cold_start.download_size_gb`."
                 " Offers with unknown cold-start costs are placed last."
                 " Lower-cost offers are often less reliable,"
                 " so consider applying stricter filters when using `price`."

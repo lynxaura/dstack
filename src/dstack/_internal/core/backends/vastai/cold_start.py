@@ -6,8 +6,13 @@ BANDWIDTH_UTILIZATION = 0.8
 
 
 def estimate_cold_start(
-    download_size_gb: float, metrics: VastAIOfferMetrics, price: float
+    download_size_gb: float,
+    metrics: VastAIOfferMetrics,
+    price: float,
+    amortization_hours: float = 1,
 ) -> ColdStartEstimate:
+    if not math.isfinite(amortization_hours) or amortization_hours <= 0:
+        raise ValueError("Amortization hours must be positive and finite")
     duration = None
     download_cost = None
     if download_size_gb == 0:
@@ -37,7 +42,10 @@ def estimate_cold_start(
         estimated_instance_cost=instance_cost,
         estimated_cost=total,
         cost_ratio=ratio,
-        mixed_cold_price=_finite(total + price) if total is not None else None,
+        mixed_cold_price=_finite(price + total / amortization_hours)
+        if total is not None
+        else None,
+        amortization_hours=amortization_hours,
     )
 
 

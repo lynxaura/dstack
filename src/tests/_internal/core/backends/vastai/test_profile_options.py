@@ -203,3 +203,43 @@ class TestMixedColdPriceOptions:
             assert "mixed_cold_price" in schema["$defs"]["VastAIOfferOrder"]["enum"]
         schema = InstanceOfferWithAvailability.model_json_schema()
         assert "mixed_cold_price" in schema["$defs"]["ColdStartEstimate"]["properties"]
+
+
+class TestColdStartAmortizationHours:
+    @pytest.mark.parametrize("hours", [1, 4, 0.5, 24])
+    def test_accepts_positive_hours(self, hours):
+        options = VastAIProfileOptions(
+            cold_start={"download_size_gb": 20, "amortization_hours": hours}
+        )
+        assert options.cold_start.amortization_hours == hours
+        assert options.model_dump()["cold_start"]["amortization_hours"] == hours
+
+    @pytest.mark.parametrize(
+        "value", [0, -1, "off", "4h", True, False, float("nan"), float("inf")]
+    )
+    def test_rejects_invalid_hours(self, value):
+        with pytest.raises(ValidationError):
+            VastAIProfileOptions(cold_start={"download_size_gb": 20, "amortization_hours": value})
+
+    def test_omitted_hours_preserve_older_server_request_compatibility(self):
+        options = VastAIProfileOptions(cold_start={"download_size_gb": 20})
+        assert "amortization_hours" not in options.model_dump()["cold_start"]
+
+    def test_combine_preserves_explicit_hours_when_other_is_unset(self):
+        default = VastAIProfileOptions(cold_start={"download_size_gb": 20})
+        explicit = VastAIProfileOptions(
+            cold_start={"download_size_gb": 20, "amortization_hours": 4}
+        )
+        assert default.combine(explicit).cold_start.amortization_hours == 4
+        assert explicit.combine(default).cold_start.amortization_hours == 4
+
+    def test_combine_rejects_conflicting_explicit_hours(self):
+        a = VastAIProfileOptions(cold_start={"download_size_gb": 20, "amortization_hours": 1})
+        b = VastAIProfileOptions(cold_start={"download_size_gb": 20, "amortization_hours": 4})
+        with pytest.raises(CombineError):
+            a.combine(b)
+
+    def test_schema_exposes_positive_hours(self):
+        schema = VastAIProfileOptions.model_json_schema()
+        field = schema["$defs"]["VastAIColdStartOptions"]["properties"]["amortization_hours"]
+        assert field["anyOf"][0] == {"type": "number", "exclusiveMinimum": 0}

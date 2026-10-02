@@ -72,3 +72,20 @@ class TestEstimateColdStart:
         assert estimate.estimated_cost is None
         assert estimate.mixed_cold_price is None
         assert estimate.cost_ratio is None
+
+    def test_amortization_changes_only_effective_hourly_ranking(self):
+        metrics = VastAIOfferMetrics(download_mbps=1000, download_cost_per_gb=0.002)
+        one_hour = estimate_cold_start(20, metrics, 0.5)
+        four_hours = estimate_cold_start(20, metrics, 0.5, 4)
+        assert one_hour.amortization_hours == 1
+        assert four_hours.amortization_hours == 4
+        assert four_hours.mixed_cold_price == pytest.approx(0.5 + one_hour.estimated_cost / 4)
+        assert four_hours.estimated_cost == one_hour.estimated_cost
+        assert four_hours.cost_ratio == one_hour.cost_ratio
+        assert four_hours.estimated_duration_seconds == one_hour.estimated_duration_seconds
+
+    def test_shorter_duration_increases_amortized_cost(self):
+        estimate = estimate_cold_start(
+            20, VastAIOfferMetrics(download_mbps=1000, download_cost_per_gb=0.002), 0.5, 0.5
+        )
+        assert estimate.mixed_cold_price == pytest.approx(0.5 + estimate.estimated_cost * 2)

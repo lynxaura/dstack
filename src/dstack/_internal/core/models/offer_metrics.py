@@ -35,6 +35,8 @@ class ColdStartEstimate(CoreModel):
     cost_ratio: Optional[NonNegativeFloat] = None
     """Total cold-start cost divided by the cost of one instance-hour; may exceed 1."""
     mixed_cold_price: Optional[NonNegativeFloat] = None
-    """Estimated cold-start cost plus one instance-hour's cost in USD; only a ranking value.
+    """Hourly instance price plus amortized cold-start cost, in USD/hour; only a ranking value.
     Does not change the hourly price or the spot bid.
     """
+    amortization_hours: Annotated[float, Field(gt=0, allow_inf_nan=False)] = 1
+    """Hours used to amortize cold-start costs; defaults to 1."""

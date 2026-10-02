@@ -312,3 +312,22 @@ class TestVastAIOfferMetrics:
                 )
             )
         assert provider.call_args.kwargs["order"] == [("score", "desc")]
+
+    def test_amortization_hours_can_reverse_mixed_price_order(self):
+        expensive_start = self._offer(
+            price=0.3, metrics={"download_mbps": 1000, "download_cost_per_gb": 0.02}
+        )
+        cheap_start = self._offer(
+            price=0.45, metrics={"download_mbps": 1000, "download_cost_per_gb": 0.0025}
+        )
+        default = self._get_offers(
+            [expensive_start, cheap_start], {"download_size_gb": 20}, "mixed_cold_price"
+        )
+        amortized = self._get_offers(
+            [expensive_start, cheap_start],
+            {"download_size_gb": 20, "amortization_hours": 4},
+            "mixed_cold_price",
+        )
+        assert [o.price for o in default] == [0.45, 0.3]
+        assert [o.price for o in amortized] == [0.3, 0.45]
+        assert amortized[0].cold_start.amortization_hours == 4

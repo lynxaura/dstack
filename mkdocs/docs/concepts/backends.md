@@ -1676,7 +1676,8 @@ When a download size is configured, API and JSON offers also include `cold_start
   "estimated_instance_cost": 0.027777777777777776,
   "estimated_cost": 0.06777777777777777,
   "cost_ratio": 0.13555555555555554,
-  "mixed_cold_price": 0.5677777777777777
+  "mixed_cold_price": 0.5677777777777777,
+  "amortization_hours": 1
 }
 ```
 
@@ -1693,10 +1694,11 @@ Existing warm instances are reusable independently of this new-instance offer fi
 When combining a profile with a run configuration, the download sizes must agree if both
 specify `cold_start`. The lower of the two ratio limits is used.
 
-#### Sorting by cold-start cost plus one hour
+#### Sorting by amortized cold-start cost
 
-Set `offer_order: mixed_cold_price` to prioritize Vast.ai offers by the cost of one
-cold start followed by one hour of running:
+Set `offer_order: mixed_cold_price` to prioritize Vast.ai offers by their effective
+hourly cost, including cold-start costs amortized over the expected running duration.
+The amortization period defaults to 1 hour:
 
 ```yaml
 backend_options:
@@ -1704,12 +1706,13 @@ backend_options:
     offer_order: mixed_cold_price
     cold_start:
       download_size_gb: 20
+      amortization_hours: 4
       # Optional: filter before sorting
       max_cost_ratio: 0.2
 ```
 
 ```text
-mixed_cold_price = cold_start.estimated_cost + offer.price * 1 hour
+mixed_cold_price = offer.price + cold_start.estimated_cost / amortization_hours
 ```
 
 This sorts ascending after filtering and before limiting the number of offers. It
@@ -1718,8 +1721,17 @@ controls the Vast.ai provisioning attempt order as well as offer display order.
 are unknown appear last; ties retain their original score order. A zero download size
 reduces the ranking to the hourly instance price.
 
-The ranking value is returned as `cold_start.mixed_cold_price` whenever cold-start
-estimates are requested. It is not an hourly billing rate: `offer.price`, spot bids,
-and actual billing remain unchanged. There is no amortization of cold-start costs.
+`amortization_hours` accepts a positive number of hours, including fractional values
+such as `0.5`. For example, $0.40/hour with a $0.20 cold start ranks as $0.60/hour with `1h`
+or $0.45/hour with `4h`. At the default `1h`, ranking values match the original
+cold-start cost plus one-hour instance price formula.
+
+The ranking value is returned as `cold_start.mixed_cold_price` (USD/hour), together
+with `cold_start.amortization_hours`, whenever cold-start estimates are
+requested. It is an estimate, not a billing rate: `offer.price`, spot bids, and actual
+billing remain unchanged. `cost_ratio` and `max_cost_ratio` still compare the full
+cold-start cost to one instance-hour's cost, independently of amortization.
+When a profile and run configuration both explicitly set amortization hours,
+the values must agree; an omitted value allows the other setting to be used.
 This order applies only within Vast.ai; other backends retain their existing ordering
 and cross-backend merging behavior.

@@ -124,7 +124,10 @@ class VastAICompute(
             if vastai_options.cold_start is not None:
                 options = vastai_options.cold_start
                 offer.cold_start = estimate_cold_start(
-                    options.download_size_gb, offer.vastai, offer.price
+                    options.download_size_gb,
+                    offer.vastai,
+                    offer.price,
+                    amortization_hours=options.amortization_hours or 1,
                 )
                 ratio = offer.cold_start.cost_ratio
                 if options.max_cost_ratio is not None and (
