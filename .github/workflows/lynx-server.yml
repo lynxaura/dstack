@@ -1,16 +1,20 @@
-name: Build Lynx dstack server
+name: Build and deploy Lynx dstack server
 
 on:
   push:
     branches: [lynx]
   workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy to EC2 after publishing the image
+        type: boolean
+        default: true
 
 permissions:
   contents: read
-  id-token: write
 
 concurrency:
-  group: lynx-dstack-image-${{ github.ref }}
+  group: lynx-dstack-server
   cancel-in-progress: false
 
 env:
@@ -21,18 +25,23 @@ jobs:
   build:
     if: github.repository == 'lynxaura/dstack' && github.ref == 'refs/heads/lynx'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image: ${{ steps.image.outputs.uri }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Validate deployment scripts
+        run: python3 -m unittest discover -s docker/lynx -p 'test_*.py'
 
       - name: Determine image tag
         id: image
         shell: bash
         run: |
-          commit=$(git rev-parse HEAD)
-          tag=${commit:0:8}
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "uri=$ECR_REPOSITORY:$tag" >> "$GITHUB_OUTPUT"
+          echo "uri=$ECR_REPOSITORY:${GITHUB_SHA:0:8}" >> "$GITHUB_OUTPUT"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -52,6 +61,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push server image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -71,3 +81,32 @@ jobs:
         run: |
           echo '### Lynx dstack image' >> "$GITHUB_STEP_SUMMARY"
           echo "\`$IMAGE_URI\`" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    needs: build
+    if: vars.EC2_INSTANCE_ID != '' && (github.event_name == 'push' || inputs.deploy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS account
+        run: |
+          account=$(aws sts get-caller-identity --query Account --output text)
+          test "$account" = '806758135039'
+
+      - name: Deploy server through SSM
+        env:
+          EC2_INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          DSTACK_SERVER_IMAGE: ${{ needs.build.outputs.image }}
+        run: python3 docker/lynx/deploy_ec2.py
