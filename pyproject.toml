@@ -33,7 +33,7 @@ dependencies = [
     "python-multipart>=0.0.16",
     "filelock",
     "psutil",
-    "gpuhunt==0.1.30",
+    "gpuhunt==0.1.32",
     "argcomplete>=3.5.0",
     "ignore-python>=0.2.0",
     "apscheduler<4",
@@ -110,6 +110,7 @@ include = [
     "src/dstack/_internal/server",
     "src/dstack/_internal/core/services",
     "src/dstack/_internal/core/backends/aws",
+    "src/dstack/_internal/core/backends/daytona",
     "src/dstack/_internal/core/backends/kubernetes",
     "src/dstack/_internal/core/backends/runpod",
     "src/dstack/_internal/core/backends/slurm",
@@ -297,7 +298,7 @@ oci = [
     "dstack[server]",
 ]
 nebius = [
-    "nebius>=0.3.4,<0.4",
+    "nebius>=0.6.13,<0.7",
     "dstack[server]",
 ]
 fluentbit = [
