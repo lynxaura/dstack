@@ -3,11 +3,15 @@ from unittest.mock import Mock, patch
 import pytest
 
 from dstack._internal.core.models.backends.base import BackendType
+from dstack._internal.core.models.offer_metrics import ColdStartEstimate, VastAIOfferMetrics
 from dstack._internal.core.models.profiles import Profile
 from dstack._internal.core.models.resources import ResourcesSpec
 from dstack._internal.core.models.runs import Requirements
 from dstack._internal.core.models.volumes import DaytonaVolumeConfiguration
-from dstack._internal.server.services.offers import get_offers_by_requirements
+from dstack._internal.server.services.offers import (
+    generate_shared_offer,
+    get_offers_by_requirements,
+)
 from dstack._internal.server.testing.common import (
     get_instance_offer_with_availability,
     get_kubernetes_volume_configuration,
@@ -240,3 +244,13 @@ class TestGetOffersByRequirements:
             )
             m.assert_awaited_once()
             assert res == []
+
+
+class TestGenerateSharedOfferMetrics:
+    def test_preserves_offer_metrics_and_full_instance_estimate(self):
+        offer = get_instance_offer_with_availability(backend=BackendType.VASTAI, gpu_count=2)
+        offer.vastai = VastAIOfferMetrics(download_mbps=1000)
+        offer.cold_start = ColdStartEstimate(download_size_gb=20, estimated_duration_seconds=200)
+        restricted = generate_shared_offer(offer, 1, 2)
+        assert restricted.vastai == offer.vastai
+        assert restricted.cold_start == offer.cold_start

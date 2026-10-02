@@ -168,3 +168,83 @@ def test_vastai_run_job_does_not_bid_on_ondemand_offer():
     _run_job(compute, _offer(spot=False, price=0.24))
 
     assert compute.api_client.create_instance.call_args.kwargs["bid"] is None
+
+
+class TestVastAIOfferMetrics:
+    def _get_offers(self, offers, cold_start=None, offer_order=None):
+        options = VastAIProfileOptions(cold_start=cold_start, offer_order=offer_order)
+        with patch(
+            "dstack._internal.core.backends.vastai.compute.get_catalog_offers", return_value=offers
+        ):
+            return VastAICompute(_config()).get_offers_by_requirements(
+                _requirements(backend_options=[options]), False, False
+            )
+
+    def _offer(self, price=0.5, metrics=None, spot=False):
+        offer = _offer(spot=spot, price=price)
+        offer.backend_data["vastai"] = (
+            metrics
+            if metrics is not None
+            else {"download_mbps": 1000, "download_cost_per_gb": 0.002, "disk_read_mbps": 1500}
+        )
+        return offer
+
+    def test_returns_raw_metrics_without_cold_start_options(self):
+        offers = self._get_offers([self._offer()])
+        assert offers[0].vastai.download_mbps == 1000
+        assert offers[0].vastai.disk_read_mbps == 1500
+        assert offers[0].cold_start is None
+        assert offers[0].model_dump()["vastai"]["download_cost_per_gb"] == 0.002
+
+    def test_returns_estimate_without_filtering_when_no_maximum_is_set(self):
+        offers = self._get_offers(
+            [self._offer(), self._offer(metrics={})], {"download_size_gb": 20}
+        )
+        assert len(offers) == 2
+        assert offers[0].cold_start.estimated_duration_seconds == 200
+        assert offers[1].cold_start.estimated_cost is None
+
+    def test_filters_cost_ratio_using_each_variants_hourly_price(self):
+        offers = self._get_offers(
+            [self._offer(price=0.1, spot=True), self._offer(price=0.5), self._offer(metrics={})],
+            {"download_size_gb": 20, "max_cost_ratio": 0.2},
+        )
+        assert len(offers) == 1
+        assert offers[0].price == 0.5
+        assert offers[0].cold_start.cost_ratio < 0.2
+
+    def test_inclusive_threshold_keeps_matching_offer(self):
+        offers = self._get_offers(
+            [self._offer(metrics={"download_mbps": 1000, "download_cost_per_gb": 0})],
+            {"download_size_gb": 20, "max_cost_ratio": 200 / 3600},
+        )
+        assert len(offers) == 1
+
+    def test_filter_keeps_score_order_and_price_order_still_works(self):
+        offers = [self._offer(price=0.8), self._offer(price=0.5)]
+        options = {"download_size_gb": 20, "max_cost_ratio": 0.2}
+        assert [o.price for o in self._get_offers(offers, options)] == [0.8, 0.5]
+        assert [o.price for o in self._get_offers(offers, options, "price")] == [0.5, 0.8]
+
+    def test_cache_separates_different_download_sizes(self):
+        compute = VastAICompute(_config())
+        with patch(
+            "dstack._internal.core.backends.vastai.compute.get_catalog_offers",
+            side_effect=lambda **kwargs: [self._offer()],
+        ):
+            small = list(
+                compute.get_offers(
+                    _requirements([VastAIProfileOptions(cold_start={"download_size_gb": 20})]),
+                    False,
+                    False,
+                )
+            )
+            large = list(
+                compute.get_offers(
+                    _requirements([VastAIProfileOptions(cold_start={"download_size_gb": 40})]),
+                    False,
+                    False,
+                )
+            )
+        assert small[0].cold_start.estimated_duration_seconds == 200
+        assert large[0].cold_start.estimated_duration_seconds == 400

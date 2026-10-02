@@ -7,6 +7,7 @@ from dstack._internal.core.backends.base.profile_options import BackendProfileOp
 from dstack._internal.core.models.common import CoreModel
 from dstack._internal.utils.combine import (
     CombineError,
+    combine_optional,
     get_max_optional,
     get_single_value_optional,
 )
@@ -82,6 +83,37 @@ class VastAIExtraFilters(CoreModel):
     vms_enabled: Optional[VastAIFilter] = None
 
 
+class VastAIColdStartOptions(CoreModel):
+    download_size_gb: Annotated[
+        float,
+        Field(
+            ge=0,
+            allow_inf_nan=False,
+            description="Per-instance uncached download size in decimal GB",
+        ),
+    ]
+    max_cost_ratio: Annotated[
+        Optional[float],
+        Field(
+            ge=0,
+            allow_inf_nan=False,
+            description=(
+                "Maximum estimated cold-start cost divided by one instance-hour's cost."
+                " Uses 80% of advertised download bandwidth and includes download traffic"
+                " and instance charges during the download. May exceed 1"
+            ),
+        ),
+    ] = None
+
+    def combine(self, other: "VastAIColdStartOptions") -> "VastAIColdStartOptions":
+        if self.download_size_gb != other.download_size_gb:
+            raise CombineError("Conflicting Vast.ai cold-start download sizes")
+        return VastAIColdStartOptions(
+            download_size_gb=self.download_size_gb,
+            max_cost_ratio=combine_optional(self.max_cost_ratio, other.max_cost_ratio, min),
+        )
+
+
 class VastAIProfileOptions(BackendProfileOptions["VastAIProfileOptions"]):
     type: Literal["vastai"] = "vastai"
     offer_order: Annotated[
@@ -131,12 +163,23 @@ class VastAIProfileOptions(BackendProfileOptions["VastAIProfileOptions"]):
         ),
     ] = None
 
+    cold_start: Annotated[
+        Optional[VastAIColdStartOptions],
+        Field(
+            description="Estimate cold-start download time and cost, optionally filtering by cost ratio",
+            exclude_if=lambda value: value is None,
+        ),
+    ] = None
+
     def combine(self, other: "VastAIProfileOptions") -> "VastAIProfileOptions":
         return VastAIProfileOptions(
             offer_order=get_single_value_optional(self.offer_order, other.offer_order),
             min_reliability=get_max_optional(self.min_reliability, other.min_reliability),
             min_score=get_max_optional(self.min_score, other.min_score),
             extra_filters=_combine_extra_filters(self.extra_filters, other.extra_filters),
+            cold_start=combine_optional(
+                self.cold_start, other.cold_start, lambda a, b: a.combine(b)
+            ),
         )
 
 

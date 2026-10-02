@@ -182,6 +182,8 @@ def generate_shared_offer(
         region=offer.region,
         price=offer.price,
         backend_data=offer.backend_data,
+        vastai=offer.vastai,
+        cold_start=offer.cold_start,
         availability=offer.availability,
         blocks=blocks,
         total_blocks=total_blocks,

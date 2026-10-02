@@ -13,6 +13,7 @@ from dstack._internal.core.models.common import (
 )
 from dstack._internal.core.models.envs import Env
 from dstack._internal.core.models.health import HealthStatus
+from dstack._internal.core.models.offer_metrics import ColdStartEstimate, VastAIOfferMetrics
 from dstack._internal.core.models.volumes import Volume
 from dstack._internal.utils.common import format_mib_as_gb, pretty_resources
 from dstack._internal.utils.logging import get_logger
@@ -200,6 +201,8 @@ class InstanceOffer(CoreModel):
     region: str
     price: float
     backend_data: dict[str, Any] = {}
+    vastai: Optional[VastAIOfferMetrics] = None
+    cold_start: Optional[ColdStartEstimate] = None
 
     def with_availability(self, **kwargs) -> "InstanceOfferWithAvailability":
         """Convert to InstanceOfferWithAvailability without re-serializing/re-validating fields.

@@ -1604,4 +1604,90 @@ projects:
 
     </div>
 
-Also, the `vastai` backend supports on-demand instances only. Spot instance support coming soon.
+Vast.ai supports on-demand and spot offers. Use `spot_policy` to choose which offers to consider.
+
+### Vast.ai offer metrics and cold starts
+
+Vast.ai offers include a `vastai` object in the API and `dstack offer --json` output:
+
+| Field | Unit |
+| --- | --- |
+| `download_mbps` / `upload_mbps` | Internet bandwidth in Mbps |
+| `download_cost_per_gb` / `upload_cost_per_gb` | USD per decimal GB transferred |
+| `disk_read_mbps` | Disk read bandwidth in **MB/s**, not Mbps |
+| `storage_cost_per_gb_month` | USD per GB per month |
+
+Missing or invalid metrics are `null`; a zero transfer price means free traffic.
+Disk read bandwidth does not describe disk write speed. The offer's existing `price`
+remains the hourly instance price, including the selected disk allocation.
+
+To estimate cold-start downloads and optionally filter their cost, set
+`backend_options[type=vastai].cold_start` in a run configuration or profile:
+
+<div editor-title=".dstack/profiles.yml">
+
+```yaml
+profiles:
+  - name: vast-cold-start
+    backends: [vastai]
+    backend_options:
+      - type: vastai
+        cold_start:
+          download_size_gb: 20
+          max_cost_ratio: 0.2
+```
+
+</div>
+
+```shell
+dstack offer --profile vast-cold-start
+dstack offer --profile vast-cold-start --json
+dstack apply -f .dstack.yml --profile vast-cold-start
+```
+
+`download_size_gb` is the expected **per-instance** uncached download traffic in decimal GB,
+including images, models, and dependencies. It does not change the requested disk capacity.
+The same filter applies to offer discovery and cloud provisioning. Omit `max_cost_ratio`
+to return estimates without filtering offers.
+
+The estimate assumes 80% utilization of the advertised download bandwidth:
+
+```text
+time_seconds = download_size_gb * 8000 / (download_mbps * 0.8)
+traffic_cost = download_size_gb * download_cost_per_gb
+instance_cost = price * time_seconds / 3600
+total_cost = traffic_cost + instance_cost
+cost_ratio = total_cost / (price * 1 hour)
+```
+
+`max_cost_ratio: 0.2` accepts cold-start costs up to 20% of one instance-hour's cost.
+The ratio may exceed 1. Spot and on-demand variants use their own hourly prices.
+An offer with an unknown total cost or an undefined ratio (including a zero hourly price)
+is excluded when a ratio limit is set. A zero download size gives zero download time and cost.
+
+When a download size is configured, API and JSON offers also include `cold_start`:
+
+```json
+{
+  "download_size_gb": 20,
+  "bandwidth_utilization": 0.8,
+  "estimated_duration_seconds": 200,
+  "estimated_download_cost": 0.04,
+  "estimated_instance_cost": 0.027777777777777776,
+  "estimated_cost": 0.06777777777777777,
+  "cost_ratio": 0.13555555555555554
+}
+```
+
+This example assumes 1000 Mbps download bandwidth, $0.002/GB ingress, and a $0.50/hour instance.
+The plain offer table shows download bandwidth and price, disk read speed, and estimated
+cold-start download time, total cost, and percentage. Unknown values are displayed as `-`.
+
+These estimates cover downloads only, assuming no cache hits. They exclude provisioning,
+image extraction, model initialization, source-side bandwidth limits, and upload traffic.
+The instance component conservatively assumes billing during the entire download:
+[Vast.ai does not charge compute while an instance is Loading](https://github.com/vast-ai/docs/blob/main/guides/reference/billing.mdx).
+Existing warm instances are reusable independently of this new-instance offer filter.
+
+When combining a profile with a run configuration, the download sizes must agree if both
+specify `cold_start`. The lower of the two ratio limits is used.

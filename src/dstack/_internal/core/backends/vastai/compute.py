@@ -2,7 +2,6 @@ import time
 from typing import List, Optional
 
 import gpuhunt
-from gpuhunt.providers.vastai import VastAIProvider
 from typing_extensions import assert_never
 
 from dstack._internal.core.backends.base.authorized_keys import build_authorized_keys
@@ -19,6 +18,8 @@ from dstack._internal.core.backends.vastai.api_client import (
     VastAICreateInstanceError,
     VastAIRateLimitError,
 )
+from dstack._internal.core.backends.vastai.catalog import VastAIProvider
+from dstack._internal.core.backends.vastai.cold_start import estimate_cold_start
 from dstack._internal.core.backends.vastai.models import VastAIConfig
 from dstack._internal.core.backends.vastai.profile_options import (
     VASTAI_DEFAULT_MIN_RELIABILITY,
@@ -35,6 +36,7 @@ from dstack._internal.core.models.instances import (
     InstanceOfferWithAvailability,
     InstanceRuntime,
 )
+from dstack._internal.core.models.offer_metrics import VastAIOfferMetrics
 from dstack._internal.core.models.placement import PlacementGroup
 from dstack._internal.core.models.runs import Job, JobProvisioningData, Requirements, Run
 from dstack._internal.core.models.volumes import Volume
@@ -113,6 +115,23 @@ class VastAICompute(
             )
             for offer in offers
         ]
+        filtered_offers = []
+        for offer in offers:
+            offer.vastai = validate_extra_ignore(
+                VastAIOfferMetrics, offer.backend_data.get("vastai", {})
+            )
+            if vastai_options.cold_start is not None:
+                options = vastai_options.cold_start
+                offer.cold_start = estimate_cold_start(
+                    options.download_size_gb, offer.vastai, offer.price
+                )
+                ratio = offer.cold_start.cost_ratio
+                if options.max_cost_ratio is not None and (
+                    ratio is None or ratio > options.max_cost_ratio
+                ):
+                    continue
+            filtered_offers.append(offer)
+        offers = filtered_offers
         if (vastai_options.offer_order or VASTAI_DEFAULT_OFFER_ORDER) == VastAIOfferOrder.PRICE:
             offers = sorted(offers, key=lambda o: o.price)
         return offers

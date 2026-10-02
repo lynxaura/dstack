@@ -234,6 +234,7 @@ def _print_offers_table(
             total_offers=total_offers,
             max_price=max_price or 0.0,
             mute_tail_rows=False,
+            show_offer_metrics=True,
         )
         console.print()
         if show_fleet_hint_after_table:

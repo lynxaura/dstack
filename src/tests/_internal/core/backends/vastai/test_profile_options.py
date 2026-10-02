@@ -132,3 +132,51 @@ def test_vastai_profile_options_schema_exposes_extra_filter_operators():
 def test_vastai_profile_options_rejects_filters_already_exposed_by_dstack(field):
     with pytest.raises(ValidationError):
         VastAIProfileOptions(extra_filters={field: {"eq": True}})
+
+
+class TestVastAIColdStartOptions:
+    @pytest.mark.parametrize(
+        "options",
+        [
+            {"max_cost_ratio": 0.2},
+            {"download_size_gb": -1},
+            {"download_size_gb": float("nan")},
+            {"download_size_gb": float("inf")},
+            {"download_size_gb": 20, "max_cost_ratio": -1},
+            {"download_size_gb": 20, "max_cost_ratio": float("inf")},
+        ],
+    )
+    def test_rejects_invalid_options(self, options):
+        with pytest.raises(ValidationError):
+            VastAIProfileOptions(cold_start=options)
+
+    def test_ratio_may_exceed_one(self):
+        assert (
+            VastAIProfileOptions(
+                cold_start={"download_size_gb": 20, "max_cost_ratio": 2}
+            ).cold_start.max_cost_ratio
+            == 2
+        )
+
+    def test_combine_uses_stricter_ratio(self):
+        a = VastAIProfileOptions(cold_start={"download_size_gb": 20, "max_cost_ratio": 0.2})
+        b = VastAIProfileOptions(cold_start={"download_size_gb": 20, "max_cost_ratio": 0.1})
+        assert a.combine(b).cold_start.max_cost_ratio == 0.1
+        assert b.combine(a).cold_start.max_cost_ratio == 0.1
+        assert a.combine(VastAIProfileOptions()) == a
+
+    def test_conflicting_sizes_cannot_be_combined(self):
+        a = VastAIProfileOptions(cold_start={"download_size_gb": 20})
+        b = VastAIProfileOptions(cold_start={"download_size_gb": 40})
+        with pytest.raises(CombineError):
+            a.combine(b)
+
+    def test_unset_field_is_omitted_for_older_servers(self):
+        assert "cold_start" not in VastAIProfileOptions().model_dump()
+        assert "cold_start" not in VastAIProfileOptions(cold_start=None).model_dump()
+        assert (
+            VastAIProfileOptions(cold_start={"download_size_gb": 20}).model_dump()["cold_start"][
+                "download_size_gb"
+            ]
+            == 20
+        )
