@@ -204,25 +204,25 @@ class TestVastAIOfferMetrics:
         assert offers[0].cold_start.estimated_duration_seconds == 200
         assert offers[1].cold_start.estimated_cost is None
 
-    def test_filters_cost_ratio_using_each_variants_hourly_price(self):
+    def test_filters_cost_ratio_one_hour_using_each_variants_hourly_price(self):
         offers = self._get_offers(
             [self._offer(price=0.1, spot=True), self._offer(price=0.5), self._offer(metrics={})],
-            {"download_size_gb": 20, "max_cost_ratio": 0.2},
+            {"download_size_gb": 20, "max_cost_ratio_one_hour": 0.2},
         )
         assert len(offers) == 1
         assert offers[0].price == 0.5
-        assert offers[0].cold_start.cost_ratio < 0.2
+        assert offers[0].cold_start.cost_ratio_one_hour < 0.2
 
     def test_inclusive_threshold_keeps_matching_offer(self):
         offers = self._get_offers(
             [self._offer(metrics={"download_mbps": 1000, "download_cost_per_gb": 0})],
-            {"download_size_gb": 20, "max_cost_ratio": 200 / 3600},
+            {"download_size_gb": 20, "max_cost_ratio_one_hour": 200 / 3600},
         )
         assert len(offers) == 1
 
     def test_filter_keeps_score_order_and_price_order_still_works(self):
         offers = [self._offer(price=0.8), self._offer(price=0.5)]
-        options = {"download_size_gb": 20, "max_cost_ratio": 0.2}
+        options = {"download_size_gb": 20, "max_cost_ratio_one_hour": 0.2}
         assert [o.price for o in self._get_offers(offers, options)] == [0.8, 0.5]
         assert [o.price for o in self._get_offers(offers, options, "price")] == [0.5, 0.8]
 
@@ -284,7 +284,7 @@ class TestVastAIOfferMetrics:
     def test_mixed_order_still_applies_ratio_filter(self):
         offers = self._get_offers(
             [self._offer(price=0.1), self._offer(price=0.5), self._offer(metrics={})],
-            {"download_size_gb": 20, "max_cost_ratio": 0.2},
+            {"download_size_gb": 20, "max_cost_ratio_one_hour": 0.2},
             "mixed_cold_price",
         )
         assert len(offers) == 1

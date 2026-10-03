@@ -141,12 +141,12 @@ class TestVastAIColdStartOptions:
     @pytest.mark.parametrize(
         "options",
         [
-            {"max_cost_ratio": 0.2},
+            {"max_cost_ratio_one_hour": 0.2},
             {"download_size_gb": -1},
             {"download_size_gb": float("nan")},
             {"download_size_gb": float("inf")},
-            {"download_size_gb": 20, "max_cost_ratio": -1},
-            {"download_size_gb": 20, "max_cost_ratio": float("inf")},
+            {"download_size_gb": 20, "max_cost_ratio_one_hour": -1},
+            {"download_size_gb": 20, "max_cost_ratio_one_hour": float("inf")},
         ],
     )
     def test_rejects_invalid_options(self, options):
@@ -156,16 +156,20 @@ class TestVastAIColdStartOptions:
     def test_ratio_may_exceed_one(self):
         assert (
             VastAIProfileOptions(
-                cold_start={"download_size_gb": 20, "max_cost_ratio": 2}
-            ).cold_start.max_cost_ratio
+                cold_start={"download_size_gb": 20, "max_cost_ratio_one_hour": 2}
+            ).cold_start.max_cost_ratio_one_hour
             == 2
         )
 
     def test_combine_uses_stricter_ratio(self):
-        a = VastAIProfileOptions(cold_start={"download_size_gb": 20, "max_cost_ratio": 0.2})
-        b = VastAIProfileOptions(cold_start={"download_size_gb": 20, "max_cost_ratio": 0.1})
-        assert a.combine(b).cold_start.max_cost_ratio == 0.1
-        assert b.combine(a).cold_start.max_cost_ratio == 0.1
+        a = VastAIProfileOptions(
+            cold_start={"download_size_gb": 20, "max_cost_ratio_one_hour": 0.2}
+        )
+        b = VastAIProfileOptions(
+            cold_start={"download_size_gb": 20, "max_cost_ratio_one_hour": 0.1}
+        )
+        assert a.combine(b).cold_start.max_cost_ratio_one_hour == 0.1
+        assert b.combine(a).cold_start.max_cost_ratio_one_hour == 0.1
         assert a.combine(VastAIProfileOptions()) == a
 
     def test_conflicting_sizes_cannot_be_combined(self):
@@ -203,6 +207,17 @@ class TestMixedColdPriceOptions:
             assert "mixed_cold_price" in schema["$defs"]["VastAIOfferOrder"]["enum"]
         schema = InstanceOfferWithAvailability.model_json_schema()
         assert "mixed_cold_price" in schema["$defs"]["ColdStartEstimate"]["properties"]
+
+    def test_schema_exposes_one_hour_ratio_names(self):
+        for model in (DstackConfiguration, ProfilesConfig):
+            properties = model.model_json_schema()["$defs"]["VastAIColdStartOptions"]["properties"]
+            assert "max_cost_ratio_one_hour" in properties
+            assert "max_cost_ratio" not in properties
+        properties = InstanceOfferWithAvailability.model_json_schema()["$defs"][
+            "ColdStartEstimate"
+        ]["properties"]
+        assert "cost_ratio_one_hour" in properties
+        assert "cost_ratio" not in properties
 
 
 class TestColdStartAmortizationHours:

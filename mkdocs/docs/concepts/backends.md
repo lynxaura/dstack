@@ -1612,12 +1612,14 @@ Vast.ai offers include a `vastai` object in the API and `dstack offer --json` ou
 
 | Field | Unit |
 | --- | --- |
+| `dlperf` | Vast.ai's estimated deep-learning performance score; higher is better |
 | `download_mbps` / `upload_mbps` | Internet bandwidth in Mbps |
 | `download_cost_per_gb` / `upload_cost_per_gb` | USD per decimal GB transferred |
 | `disk_read_mbps` | Disk read bandwidth in **MB/s**, not Mbps |
 | `storage_cost_per_gb_month` | USD per GB per month |
 
 Missing or invalid metrics are `null`; a zero transfer price means free traffic.
+`dlperf` is an approximate performance score, not TFLOPS or model-specific tokens/second.
 Disk read bandwidth does not describe disk write speed. The offer's existing `price`
 remains the hourly instance price, including the selected disk allocation.
 
@@ -1634,7 +1636,7 @@ profiles:
       - type: vastai
         cold_start:
           download_size_gb: 20
-          max_cost_ratio: 0.2
+          max_cost_ratio_one_hour: 0.2
 ```
 
 </div>
@@ -1647,7 +1649,7 @@ dstack apply -f .dstack.yml --profile vast-cold-start
 
 `download_size_gb` is the expected **per-instance** uncached download traffic in decimal GB,
 including images, models, and dependencies. It does not change the requested disk capacity.
-The same filter applies to offer discovery and cloud provisioning. Omit `max_cost_ratio`
+The same filter applies to offer discovery and cloud provisioning. Omit `max_cost_ratio_one_hour`
 to return estimates without filtering offers.
 
 The estimate assumes 80% utilization of the advertised download bandwidth:
@@ -1657,10 +1659,10 @@ time_seconds = download_size_gb * 8000 / (download_mbps * 0.8)
 traffic_cost = download_size_gb * download_cost_per_gb
 instance_cost = price * time_seconds / 3600
 total_cost = traffic_cost + instance_cost
-cost_ratio = total_cost / (price * 1 hour)
+cost_ratio_one_hour = total_cost / (price * 1 hour)
 ```
 
-`max_cost_ratio: 0.2` accepts cold-start costs up to 20% of one instance-hour's cost.
+`max_cost_ratio_one_hour: 0.2` accepts cold-start costs up to 20% of one instance-hour's cost.
 The ratio may exceed 1. Spot and on-demand variants use their own hourly prices.
 An offer with an unknown total cost or an undefined ratio (including a zero hourly price)
 is excluded when a ratio limit is set. A zero download size gives zero download time and cost.
@@ -1675,7 +1677,7 @@ When a download size is configured, API and JSON offers also include `cold_start
   "estimated_download_cost": 0.04,
   "estimated_instance_cost": 0.027777777777777776,
   "estimated_cost": 0.06777777777777777,
-  "cost_ratio": 0.13555555555555554,
+  "cost_ratio_one_hour": 0.13555555555555554,
   "mixed_cold_price": 0.5677777777777777,
   "amortization_hours": 1
 }
@@ -1708,7 +1710,7 @@ backend_options:
       download_size_gb: 20
       amortization_hours: 4
       # Optional: filter before sorting
-      max_cost_ratio: 0.2
+      max_cost_ratio_one_hour: 0.2
 ```
 
 ```text
@@ -1729,7 +1731,7 @@ cold-start cost plus one-hour instance price formula.
 The ranking value is returned as `cold_start.mixed_cold_price` (USD/hour), together
 with `cold_start.amortization_hours`, whenever cold-start estimates are
 requested. It is an estimate, not a billing rate: `offer.price`, spot bids, and actual
-billing remain unchanged. `cost_ratio` and `max_cost_ratio` still compare the full
+billing remain unchanged. `cost_ratio_one_hour` and `max_cost_ratio_one_hour` still compare the full
 cold-start cost to one instance-hour's cost, independently of amortization.
 When a profile and run configuration both explicitly set amortization hours,
 the values must agree; an omitted value allows the other setting to be used.

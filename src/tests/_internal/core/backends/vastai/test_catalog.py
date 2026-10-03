@@ -31,6 +31,7 @@ def _raw_offer(**overrides):
         "inet_up": 500,
         "inet_up_cost": 0.005,
         "disk_bw": 1500,
+        "dlperf": 80.5,
         **overrides,
     }
 
@@ -51,6 +52,7 @@ class TestVastAIProvider:
             assert metrics["download_mbps"] == 1000
             assert metrics["download_cost_per_gb"] == 0.002
             assert metrics["disk_read_mbps"] == 1500
+            assert metrics["dlperf"] == 80.5
             assert item == original
         assert items[0].spot
         assert items[0].provider_data["min_bid"] == 0.2
@@ -84,14 +86,18 @@ class TestGetOfferMetrics:
     @pytest.mark.parametrize("value", [None, -1, "invalid", float("nan"), float("inf"), True])
     def test_unknown_or_invalid_metrics_are_null(self, value):
         metrics = get_offer_metrics(
-            {"inet_down": value, "inet_down_cost": value, "disk_bw": value}
+            {"inet_down": value, "inet_down_cost": value, "disk_bw": value, "dlperf": value}
         )
         assert metrics.download_mbps is None
         assert metrics.download_cost_per_gb is None
         assert metrics.disk_read_mbps is None
+        assert metrics.dlperf is None
 
     def test_zero_cost_is_preserved(self):
         assert get_offer_metrics({"inet_down_cost": 0}).download_cost_per_gb == 0
+
+    def test_missing_dlperf_is_null(self):
+        assert get_offer_metrics({}).dlperf is None
 
 
 class TestVastAICatalogIntegration:
@@ -103,7 +109,9 @@ class TestVastAICatalogIntegration:
         requirements = Requirements(
             resources=ResourcesSpec(),
             backend_options=[
-                VastAIProfileOptions(cold_start={"download_size_gb": 20, "max_cost_ratio": 0.2})
+                VastAIProfileOptions(
+                    cold_start={"download_size_gb": 20, "max_cost_ratio_one_hour": 0.2}
+                )
             ],
         )
         with patch(
@@ -115,5 +123,6 @@ class TestVastAICatalogIntegration:
         payload = offers[0].model_dump(mode="json")
         assert payload["vastai"]["download_mbps"] == 1000
         assert payload["vastai"]["disk_read_mbps"] == 1500
+        assert payload["vastai"]["dlperf"] == 80.5
         assert payload["cold_start"]["estimated_duration_seconds"] == 200
-        assert payload["cold_start"]["cost_ratio"] <= 0.2
+        assert payload["cold_start"]["cost_ratio_one_hour"] <= 0.2

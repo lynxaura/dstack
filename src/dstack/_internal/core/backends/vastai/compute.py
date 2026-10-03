@@ -129,9 +129,9 @@ class VastAICompute(
                     offer.price,
                     amortization_hours=options.amortization_hours or 1,
                 )
-                ratio = offer.cold_start.cost_ratio
-                if options.max_cost_ratio is not None and (
-                    ratio is None or ratio > options.max_cost_ratio
+                ratio = offer.cold_start.cost_ratio_one_hour
+                if options.max_cost_ratio_one_hour is not None and (
+                    ratio is None or ratio > options.max_cost_ratio_one_hour
                 ):
                     continue
             filtered_offers.append(offer)

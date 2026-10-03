@@ -83,6 +83,7 @@ class VastAIProvider(GPUHuntVastAIProvider):
 
 def get_offer_metrics(offer: dict) -> VastAIOfferMetrics:
     return VastAIOfferMetrics(
+        dlperf=_nonnegative_number(offer.get("dlperf")),
         download_mbps=_nonnegative_number(offer.get("inet_down")),
         download_cost_per_gb=_nonnegative_number(offer.get("inet_down_cost")),
         upload_mbps=_nonnegative_number(offer.get("inet_up")),

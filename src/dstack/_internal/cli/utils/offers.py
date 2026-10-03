@@ -72,8 +72,8 @@ def print_offers_table(
                         ),
                         _format_metric(estimate.estimated_cost if estimate else None, "", "$"),
                         _format_metric(
-                            estimate.cost_ratio * 100
-                            if estimate and estimate.cost_ratio is not None
+                            estimate.cost_ratio_one_hour * 100
+                            if estimate and estimate.cost_ratio_one_hour is not None
                             else None,
                             "%",
                         ),

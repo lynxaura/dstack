@@ -93,7 +93,7 @@ class VastAIColdStartOptions(CoreModel):
             description="Per-instance uncached download size in decimal GB",
         ),
     ]
-    max_cost_ratio: Annotated[
+    max_cost_ratio_one_hour: Annotated[
         Optional[float],
         Field(
             ge=0,
@@ -114,7 +114,7 @@ class VastAIColdStartOptions(CoreModel):
             description=(
                 "Hours over which cold-start costs are amortized for mixed_cold_price."
                 " Defaults to 1; fractional hours such as 0.5 are supported."
-                " Does not change the one-hour cost_ratio or actual billing"
+                " Does not change cost_ratio_one_hour or actual billing"
             ),
             exclude_if=lambda value: value is None,
         ),
@@ -132,7 +132,9 @@ class VastAIColdStartOptions(CoreModel):
             raise CombineError("Conflicting Vast.ai cold-start download sizes")
         return VastAIColdStartOptions(
             download_size_gb=self.download_size_gb,
-            max_cost_ratio=combine_optional(self.max_cost_ratio, other.max_cost_ratio, min),
+            max_cost_ratio_one_hour=combine_optional(
+                self.max_cost_ratio_one_hour, other.max_cost_ratio_one_hour, min
+            ),
             amortization_hours=get_single_value_optional(
                 self.amortization_hours, other.amortization_hours
             ),

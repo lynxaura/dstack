@@ -41,7 +41,7 @@ def estimate_cold_start(
         estimated_download_cost=download_cost,
         estimated_instance_cost=instance_cost,
         estimated_cost=total,
-        cost_ratio=ratio,
+        cost_ratio_one_hour=ratio,
         mixed_cold_price=_finite(price + total / amortization_hours)
         if total is not None
         else None,
