@@ -15,6 +15,7 @@ from dstack._internal.core.models.runs import Requirements
 def _raw_offer(**overrides):
     return {
         "id": 12345,
+        "machine_id": 6789,
         "cpu_cores": 16,
         "cpu_cores_effective": 8,
         "cpu_ram": 64000,
@@ -49,6 +50,7 @@ class TestVastAIProvider:
         assert len(items) == 2
         for item, original in zip(items, upstream):
             metrics = item.provider_data.pop("vastai")
+            assert metrics["machine_id"] == 6789
             assert metrics["download_mbps"] == 1000
             assert metrics["download_cost_per_gb"] == 0.002
             assert metrics["disk_read_mbps"] == 1500
@@ -99,10 +101,12 @@ class TestGetOfferMetrics:
     def test_missing_dlperf_is_null(self):
         assert get_offer_metrics({}).dlperf is None
 
+    def test_missing_machine_id_is_null(self):
+        assert get_offer_metrics({}).machine_id is None
+
 
 class TestVastAICatalogIntegration:
     def test_raw_api_metrics_reach_filtered_instance_offers(self):
-
         response = Mock()
         response.json.return_value = {"offers": [_raw_offer()]}
         compute = VastAICompute(VastAIConfig(creds=VastAICreds(api_key="test")))
@@ -121,6 +125,7 @@ class TestVastAICatalogIntegration:
         assert len(offers) == 1
         assert not offers[0].instance.resources.spot
         payload = offers[0].model_dump(mode="json")
+        assert payload["vastai"]["machine_id"] == 6789
         assert payload["vastai"]["download_mbps"] == 1000
         assert payload["vastai"]["disk_read_mbps"] == 1500
         assert payload["vastai"]["dlperf"] == 80.5

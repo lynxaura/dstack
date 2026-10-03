@@ -8,6 +8,8 @@ NonNegativeFloat = Annotated[float, Field(ge=0, allow_inf_nan=False)]
 
 
 class VastAIOfferMetrics(CoreModel):
+    machine_id: Optional[int] = None
+    """Vast.ai host machine ID; distinct from the offer ID in instance.name."""
     dlperf: Optional[NonNegativeFloat] = None
     """Vast.ai's estimated deep-learning performance score; not TFLOPS or tokens/second."""
     download_mbps: Optional[NonNegativeFloat] = None
